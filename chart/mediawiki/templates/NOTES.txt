@@ -1,0 +1,11 @@
+MediaWiki {{ .Chart.AppVersion }} / chart {{ .Chart.Version }}
+Web replicas: {{ .Values.replicaCount }}
+Fresh install: {{ .Values.bootstrap.enabled }}
+Bitnami uploads import: {{ .Values.bitnamiImport.enabled }}
+Schema upgrade: {{ .Values.migration.enabled }}
+Run install OR import OR schema upgrade with replicaCount=0, one operation at a time.
+Configuration is generated from values.yaml. See README.md and MIGRATION.md.
+Helm cannot roll back database changes.
+
+Database mode: {{ if .Values.mariadb.enabled }}dedicated standalone MariaDB{{ else }}external database{{ end }}
+Database endpoint: {{ include "mw.dbHost" . }}:{{ include "mw.dbPort" . }}

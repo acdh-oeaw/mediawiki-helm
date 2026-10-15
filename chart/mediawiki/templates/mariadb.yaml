@@ -1,0 +1,182 @@
+{{- if .Values.mariadb.enabled }}
+{{- if eq .Values.mariadb.auth.username "root" }}
+{{- fail "mariadb.auth.username must be an application user, not root" }}
+{{- end }}
+{{- if not .Values.mariadb.auth.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "mw.dbSecret" . }}
+type: Opaque
+data:
+  database-user: {{ .Values.mariadb.auth.username | b64enc | quote }}
+  database-password: {{ required "mariadb.auth.password or existingSecret required" .Values.mariadb.auth.password | b64enc | quote }}
+  root-password: {{ required "mariadb.auth.rootPassword or existingSecret required" .Values.mariadb.auth.rootPassword | b64enc | quote }}
+---
+{{- end }}
+{{- if not .Values.mariadb.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mw.mariadbClaim" . }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "mw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mariadb
+spec:
+  accessModes:
+    {{- toYaml .Values.mariadb.persistence.accessModes | nindent 4 }}
+  {{- if eq .Values.mariadb.persistence.storageClass "-" }}
+  storageClassName: ""
+  {{- else if .Values.mariadb.persistence.storageClass }}
+  storageClassName: {{ .Values.mariadb.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.mariadb.persistence.size }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mw.fullname" . }}-mariadb-headless
+spec:
+  clusterIP: None
+  selector:
+    {{- include "mw.selector" . | nindent 4 }}
+    app.kubernetes.io/component: mariadb
+  ports:
+    - {name: mysql, port: 3306, targetPort: mysql}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mw.fullname" . }}-mariadb
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "mw.selector" . | nindent 4 }}
+    app.kubernetes.io/component: mariadb
+  ports:
+    - {name: mysql, port: 3306, targetPort: mysql}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mw.fullname" . }}-mariadb
+  labels:
+    {{- include "mw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mariadb
+spec:
+  replicas: 1
+  serviceName: {{ include "mw.fullname" . }}-mariadb-headless
+  selector:
+    matchLabels:
+      {{- include "mw.selector" . | nindent 6 }}
+      app.kubernetes.io/component: mariadb
+  template:
+    metadata:
+      labels:
+        {{- include "mw.selector" . | nindent 8 }}
+        app.kubernetes.io/component: mariadb
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.mariadb.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mariadb
+          image: {{ include "mw.mariadbImage" . | quote }}
+          imagePullPolicy: {{ .Values.mariadb.image.pullPolicy }}
+          args: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+          securityContext:
+            {{- toYaml .Values.mariadb.containerSecurityContext | nindent 12 }}
+          ports:
+            - {name: mysql, containerPort: 3306}
+          env:
+            - name: MARIADB_DATABASE
+              value: {{ .Values.mariadb.auth.database | quote }}
+            - name: MARIADB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mw.dbSecret" . }}
+                  key: database-user
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mw.dbSecret" . }}
+                  key: database-password
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mw.dbSecret" . }}
+                  key: root-password
+          resources:
+            {{- toYaml .Values.mariadb.resources | nindent 12 }}
+          startupProbe:
+            exec:
+              command: [healthcheck.sh, --connect, --innodb_initialized]
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            exec:
+              command: [healthcheck.sh, --connect, --innodb_initialized]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: [healthcheck.sh, --connect]
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/mysql}
+            - {name: run, mountPath: /run/mysqld}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "mw.mariadbClaim" . }}
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.mariadb.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mariadb.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mariadb.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- if .Values.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mw.fullname" . }}-mariadb
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mw.selector" . | nindent 6 }}
+      app.kubernetes.io/component: mariadb
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "mw.selector" . | nindent 14 }}
+      ports: [{protocol: TCP, port: 3306}]
+  egress: [{}]
+{{- end }}
+{{- end }}

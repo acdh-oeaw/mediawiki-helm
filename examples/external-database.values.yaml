@@ -1,0 +1,11 @@
+mariadb:
+  enabled: false
+externalDatabase:
+  host: mariadb-maxscale.database.svc.cluster.local
+  port: 3306
+  database: mediawiki
+  user: mediawiki
+  password: REPLACE_DB_PASSWORD
+security:
+  secretKey: REPLACE_RANDOM_STABLE_SECRET_KEY
+  upgradeKey: REPLACE_RANDOM_STABLE_UPGRADE_KEY

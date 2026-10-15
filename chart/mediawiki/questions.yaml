@@ -1,0 +1,153 @@
+categories:
+- Wiki
+questions:
+- variable: mariadb.enabled
+  label: Create dedicated MariaDB server
+  description: False uses externalDatabase; true creates a standalone MariaDB StatefulSet
+    and PVC.
+  type: boolean
+  default: false
+  group: Database mode
+- variable: mariadb.auth.database
+  label: Dedicated database name
+  type: string
+  group: Dedicated MariaDB
+- variable: mariadb.auth.username
+  label: Dedicated application DB user
+  type: string
+  group: Dedicated MariaDB
+- variable: mariadb.auth.password
+  label: Dedicated application DB password
+  type: password
+  group: Dedicated MariaDB
+- variable: mariadb.auth.rootPassword
+  label: Dedicated MariaDB root password
+  type: password
+  group: Dedicated MariaDB
+- variable: mariadb.auth.existingSecret
+  label: Existing MariaDB credentials Secret (optional)
+  description: 'Keys: database-user, database-password, root-password.'
+  type: string
+  group: Dedicated MariaDB
+- variable: mariadb.persistence.size
+  label: Dedicated DB volume size
+  type: string
+  group: Dedicated MariaDB
+- variable: mariadb.persistence.storageClass
+  label: Dedicated DB storage class
+  type: string
+  group: Dedicated MariaDB
+- variable: mediawiki.name
+  label: Wiki name
+  type: string
+  group: Wiki
+- variable: mediawiki.server
+  label: Public URL (https://wiki.example.org)
+  type: string
+  required: true
+  group: Wiki
+- variable: externalDatabase.host
+  label: External database hostname
+  type: string
+  required: true
+  group: Database
+- variable: externalDatabase.port
+  label: Database port
+  type: int
+  group: Database
+- variable: externalDatabase.database
+  label: Database name
+  type: string
+  group: Database
+- variable: externalDatabase.user
+  label: Database user
+  type: string
+  group: Database
+- variable: externalDatabase.password
+  label: Database password
+  type: password
+  group: Database
+- variable: externalDatabase.existingSecret
+  label: Existing DB Secret (optional alternative to credentials in values)
+  type: string
+  group: Database
+- variable: security.secretKey
+  label: Stable wiki secret key (preserve from old wiki when importing)
+  type: password
+  group: Security
+- variable: security.upgradeKey
+  label: Stable upgrade key
+  type: password
+  group: Security
+- variable: security.existingSecret
+  label: Existing keys Secret (optional alternative)
+  type: string
+  group: Security
+- variable: bootstrap.enabled
+  label: Initialize EMPTY database
+  description: Requires replicas=0. Never enable for an imported database.
+  type: boolean
+  default: false
+  group: Operations
+- variable: bootstrap.adminUser
+  label: Initial administrator username
+  type: string
+  group: Operations
+- variable: bootstrap.adminPassword
+  label: Initial administrator password
+  type: password
+  group: Operations
+- variable: migration.enabled
+  label: Upgrade EXISTING database schema
+  description: Requires replicas=0; backup first. Do not combine with other operations.
+  type: boolean
+  default: false
+  group: Operations
+- variable: bitnamiImport.enabled
+  label: Copy uploads from a Bitnami data copy
+  description: Requires replicas=0 and an empty destination PVC.
+  type: boolean
+  default: false
+  group: Operations
+- variable: bitnamiImport.existingClaim
+  label: Source PVC containing copied Bitnami data (same namespace)
+  type: string
+  group: Operations
+- variable: bitnamiImport.imagesSubPath
+  label: Images directory relative to source PVC root
+  type: string
+  group: Operations
+- variable: replicaCount
+  label: Web replicas (0 during operations, 1 for serving)
+  type: int
+  min: 0
+  max: 1
+  group: Operations
+- variable: mediawiki.readOnly
+  label: Keep web UI read-only for verification
+  type: boolean
+  group: Operations
+- variable: persistence.existingClaim
+  label: Existing destination PVC (optional)
+  type: string
+  group: Storage
+- variable: persistence.subPath
+  label: Uploads directory relative to destination PVC root
+  type: string
+  group: Storage
+- variable: ingress.enabled
+  label: Enable Ingress
+  type: boolean
+  group: Ingress
+- variable: ingress.hostname
+  label: Ingress hostname
+  type: hostname
+  group: Ingress
+- variable: ingress.ingressClassName
+  label: Ingress class
+  type: string
+  group: Ingress
+- variable: ingress.tls.enabled
+  label: Enable TLS
+  type: boolean
+  group: Ingress

@@ -1,0 +1,33 @@
+# Restore the existing DB separately before running import/migration.
+replicaCount: 0
+externalDatabase:
+  host: mariadb.database.svc.cluster.local
+  database: restored_wiki
+  user: restored_wiki_user
+  password: REPLACE_DB_PASSWORD
+security:
+  secretKey: COPY_OLD_WG_SECRET_KEY
+  upgradeKey: COPY_OLD_WG_UPGRADE_KEY
+mediawiki:
+  server: https://wiki.example.org
+  name: Imported Wiki
+  readOnly: true
+bootstrap:
+  enabled: false
+bitnamiImport:
+  enabled: true
+  existingClaim: old-bitnami-data-copy
+  # Relative to PVC root. Inspect the actual layout first.
+  imagesSubPath: mediawiki/images
+persistence:
+  existingClaim: ""
+  subPath: ""
+localSettings:
+  variables:
+    wgDBprefix: "" # MUST match the imported database
+    wgScriptPath: ""
+    wgLanguageCode: en
+    wgEnableUploads: true
+    wgDefaultSkin: vector
+  skins: [Vector]
+  extensions: [] # add compatible extensions and their old configuration

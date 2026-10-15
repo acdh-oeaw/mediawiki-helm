@@ -1,0 +1,175 @@
+# mediawiki-helm: mariadb.enabled=false selects externalDatabase; true creates a dedicated server.
+replicaCount: 1
+nameOverride: ''
+fullnameOverride: ''
+image:
+  repository: docker.io/library/mediawiki
+  tag: 1.43.11
+  digest: ''
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+localSettings:
+  variables:
+    wgScriptPath: ''
+    wgLanguageCode: en
+    wgEnableUploads: true
+    wgDefaultSkin: vector
+  extensions: []
+  skins:
+  - Vector
+  extraPhp: ''
+externalDatabase:
+  host: mariadb.database.svc.cluster.local
+  port: 3306
+  database: mediawiki
+  existingSecret: ''
+  userKey: database-user
+  passwordKey: database-password
+  user: mediawiki
+  password: ''
+mediawiki:
+  server: https://wiki.example.com
+  name: My Wiki
+  email: ''
+  readOnly: false
+  readOnlyReason: 'Maintenance: migration verification in progress'
+persistence:
+  enabled: true
+  existingClaim: ''
+  subPath: ''
+  storageClass: ''
+  accessModes:
+  - ReadWriteOnce
+  size: 8Gi
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  enabled: false
+  ingressClassName: ''
+  hostname: wiki.example.com
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ''
+migration:
+  enabled: false
+  runId: upgrade
+  activeDeadlineSeconds: 1800
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: '1'
+    memory: 1Gi
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 33
+  runAsGroup: 33
+  fsGroup: 33
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+startupProbe:
+  tcpSocket:
+    port: http
+  periodSeconds: 5
+  failureThreshold: 60
+readinessProbe:
+  httpGet:
+    path: /api.php?action=query&meta=siteinfo&format=json
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+livenessProbe:
+  tcpSocket:
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+affinity: {}
+tolerations: []
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+networkPolicy:
+  enabled: false
+security:
+  existingSecret: ''
+  secretKey: ''
+  upgradeKey: ''
+bootstrap:
+  enabled: false
+  adminUser: WikiAdmin
+  adminPassword: ''
+  existingSecret: ''
+  passwordKey: admin-password
+  activeDeadlineSeconds: 1800
+bitnamiImport:
+  enabled: false
+  existingClaim: ''
+  imagesSubPath: images
+  activeDeadlineSeconds: 3600
+mariadb:
+  enabled: false
+  image:
+    repository: docker.io/library/mariadb
+    tag: 11.4.13
+    digest: ''
+    pullPolicy: IfNotPresent
+  auth:
+    database: mediawiki
+    username: mediawiki
+    password: ''
+    rootPassword: ''
+    existingSecret: ''
+  persistence:
+    existingClaim: ''
+    storageClass: ''
+    size: 8Gi
+    accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []

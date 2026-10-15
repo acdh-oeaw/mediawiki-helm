@@ -1,0 +1,97 @@
+{{- if .Values.bootstrap.enabled }}
+{{- if or (ne (int .Values.replicaCount) 0) .Values.migration.enabled .Values.bitnamiImport.enabled }}
+{{- fail "bootstrap requires replicaCount=0, migration.enabled=false and bitnamiImport.enabled=false" }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-install-r%d" (include "mw.fullname" . | trunc 40 | trimSuffix "-") (int .Release.Revision) }}
+  labels:
+    {{- include "mw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: install
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.bootstrap.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "mw.selector" . | nindent 8 }}
+        app.kubernetes.io/component: install
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        {{- include "mw.waitDatabase" . | nindent 8 }}
+      containers:
+        - name: install
+          image: {{ include "mw.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              php -r '
+                $db = new mysqli(getenv("MW_DB_HOST"), getenv("MW_DB_USER"), getenv("MW_DB_PASSWORD"), getenv("MW_DB_NAME"), (int)getenv("MW_DB_PORT"));
+                if ($db->query("SHOW TABLES")->num_rows !== 0) {
+                  fwrite(STDERR, "Database is not empty. Use migration instead.\n"); exit(1);
+                }
+              '
+              umask 077
+              printf '%s' "$MW_DB_PASSWORD" > /tmp/db-password
+              mkdir -p /tmp/installer-config
+              php maintenance/run.php install \
+                --dbtype=mysql --dbserver="$MW_DB_HOST:$MW_DB_PORT" \
+                --dbname="$MW_DB_NAME" --dbuser="$MW_DB_USER" \
+                --dbpassfile=/tmp/db-password --passfile=/etc/mediawiki-admin/password \
+                --confpath=/tmp/installer-config --server="$MW_SERVER" \
+                --scriptpath="$MW_SCRIPT_PATH" \
+                --lang="$MW_LANGUAGE" \
+                --dbprefix="$MW_DB_PREFIX" \
+                "$MW_NAME" "$MW_ADMIN_USER"
+              # Initialize selected extensions using the final values-generated config.
+              php maintenance/run.php update --conf=/etc/mediawiki-runtime/LocalSettings.php --quick
+          env:
+            - name: MW_SCRIPT_PATH
+              value: {{ .Values.localSettings.variables.wgScriptPath | default "" | quote }}
+            - name: MW_LANGUAGE
+              value: {{ .Values.localSettings.variables.wgLanguageCode | default "en" | quote }}
+            - name: MW_DB_PREFIX
+              value: {{ .Values.localSettings.variables.wgDBprefix | default "" | quote }}
+            - name: MW_ADMIN_USER
+              value: {{ .Values.bootstrap.adminUser | quote }}
+            {{- include "mw.env" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migration.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "mw.mounts" . | nindent 12 }}
+            - name: runtime-config
+              mountPath: /etc/mediawiki-runtime/LocalSettings.php
+              subPath: LocalSettings.php
+              readOnly: true
+            - name: admin-password
+              mountPath: /etc/mediawiki-admin
+              readOnly: true
+      volumes:
+        {{- include "mw.volumes" . | nindent 8 }}
+        - name: admin-password
+          secret:
+            secretName: {{ default (printf "%s-admin" (include "mw.fullname" .)) .Values.bootstrap.existingSecret }}
+            items:
+              - key: {{ .Values.bootstrap.passwordKey }}
+                path: password
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,38 @@
+replicaCount: 0
+externalDatabase:
+  host: mariadb.database.svc.cluster.local
+  database: my_wiki
+  user: wiki_user
+  password: REPLACE_DB_PASSWORD
+security:
+  # Generate ONCE with openssl rand -hex 32. Keep stable on upgrades.
+  secretKey: REPLACE_WITH_RANDOM_SECRET_KEY
+  upgradeKey: REPLACE_WITH_RANDOM_UPGRADE_KEY
+mediawiki:
+  server: https://wiki.example.org
+  name: Example Wiki
+  email: wiki-admin@example.org
+bootstrap:
+  enabled: true
+  adminUser: WikiAdmin
+  adminPassword: REPLACE_ADMIN_PASSWORD
+localSettings:
+  variables:
+    wgScriptPath: ""
+    wgLanguageCode: en
+    wgEnableUploads: true
+    wgDefaultSkin: vector
+    wgGroupPermissions:
+      '*': {edit: false, createaccount: false}
+      user: {edit: true}
+  skins: [Vector]
+  extensions: [Cite, ParserFunctions, WikiEditor]
+ingress:
+  enabled: true
+  hostname: wiki.example.org
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+persistence:
+  size: 8Gi

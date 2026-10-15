@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mw.fullname" . }}
+  labels:
+    {{- include "mw.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Avoid two writers and RWO multi-attach during rollout.
+  strategy: {type: Recreate}
+  selector:
+    matchLabels:
+      {{- include "mw.selector" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "mw.selector" . | nindent 8 }}
+        app.kubernetes.io/component: web
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/settings: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        checksum/runtime: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mediawiki
+          image: {{ include "mw.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # Direct Apache start avoids entrypoint writes to a read-only filesystem.
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              . /etc/apache2/envvars
+              export APACHE_RUN_DIR=/tmp/apache2
+              export APACHE_LOCK_DIR=/tmp/apache2
+              export APACHE_PID_FILE=/tmp/apache2/apache2.pid
+              mkdir -p "$APACHE_RUN_DIR"
+              exec apache2 -DFOREGROUND
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            {{- include "mw.env" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          volumeMounts:
+            {{- include "mw.mounts" . | nindent 12 }}
+      volumes:
+        {{- include "mw.volumes" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,25 @@
+name: Validate MediaWiki chart
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - run: bash scripts/install-helm.sh
+      - run: pip install PyYAML==6.0.3
+      - run: python3 scripts/validate.py
+      - name: PHP and Apache runtime smoke test
+        run: bash scripts/smoke-test.sh
+      - name: Fresh install integration test against MariaDB 12
+        run: bash scripts/integration-test.sh
+      - name: Dedicated MariaDB image non-root integration test
+        env:
+          MARIADB_TEST_IMAGE: mariadb:11.4.13
+          MARIADB_TEST_NONROOT: 'true'
+        run: bash scripts/integration-test.sh

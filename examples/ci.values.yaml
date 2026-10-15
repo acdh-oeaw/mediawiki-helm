@@ -1,0 +1,5 @@
+externalDatabase:
+  password: ci-only-password
+security:
+  secretKey: ci-only-not-for-production-secret-key
+  upgradeKey: ci-only-not-for-production-upgrade-key

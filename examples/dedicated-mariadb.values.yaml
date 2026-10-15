@@ -1,0 +1,29 @@
+# Fresh standalone wiki + its own MariaDB instance and separate PVC.
+replicaCount: 0
+mariadb:
+  enabled: true
+  auth:
+    database: mediawiki
+    username: mediawiki
+    password: REPLACE_APP_DB_PASSWORD
+    rootPassword: REPLACE_ROOT_PASSWORD
+  persistence:
+    size: 8Gi
+security:
+  secretKey: REPLACE_RANDOM_STABLE_SECRET_KEY
+  upgradeKey: REPLACE_RANDOM_STABLE_UPGRADE_KEY
+bootstrap:
+  enabled: true
+  adminUser: WikiAdmin
+  adminPassword: REPLACE_ADMIN_PASSWORD
+mediawiki:
+  name: My Wiki
+  server: https://wiki.example.org
+localSettings:
+  variables:
+    wgLanguageCode: en
+    wgScriptPath: ''
+    wgEnableUploads: true
+  skins: [Vector]
+persistence:
+  size: 8Gi

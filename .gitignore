@@ -1,0 +1,7 @@
+.tools/
+.packages/
+.rendered/
+__pycache__/
+*.private.yaml
+LocalSettings.php
+.integration/

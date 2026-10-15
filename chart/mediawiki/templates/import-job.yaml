@@ -1,0 +1,73 @@
+{{- if .Values.bitnamiImport.enabled }}
+{{- if or (ne (int .Values.replicaCount) 0) .Values.bootstrap.enabled .Values.migration.enabled }}
+{{- fail "bitnamiImport requires replicaCount=0 and bootstrap/migration disabled" }}
+{{- end }}
+{{- if not .Values.persistence.enabled }}
+{{- fail "bitnamiImport requires persistent destination storage" }}
+{{- end }}
+{{- if eq .Values.bitnamiImport.existingClaim (include "mw.claim" .) }}
+{{- fail "Source and destination PVC must be different" }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-import-r%d" (include "mw.fullname" . | trunc 40 | trimSuffix "-") (int .Release.Revision) }}
+  labels:
+    {{- include "mw.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.bitnamiImport.activeDeadlineSeconds }}
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: copy-uploads
+          image: {{ include "mw.image" . | quote }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              test -d /source
+              if find /destination -mindepth 1 -maxdepth 1 ! -name lost+found | read -r entry; then
+                echo "Destination is not empty; refusing to overwrite uploads" >&2
+                exit 1
+              fi
+              cp -R --no-preserve=ownership /source/. /destination/
+              echo "Uploads copied. Old LocalSettings and application code were not copied."
+          resources:
+            {{- toYaml .Values.migration.resources | nindent 12 }}
+          volumeMounts:
+            - name: source
+              mountPath: /source
+              subPath: {{ .Values.bitnamiImport.imagesSubPath | quote }}
+              readOnly: true
+            - name: destination
+              mountPath: /destination
+              {{- with .Values.persistence.subPath }}
+              subPath: {{ . | quote }}
+              {{- end }}
+      volumes:
+        - name: source
+          persistentVolumeClaim:
+            claimName: {{ required "bitnamiImport.existingClaim is required" .Values.bitnamiImport.existingClaim }}
+            readOnly: true
+        - name: destination
+          persistentVolumeClaim:
+            claimName: {{ include "mw.claim" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mw.fullname" . }}-runtime
+  labels:
+    {{- include "mw.labels" . | nindent 4 }}
+data:
+  LocalSettings.php: |
+    <?php
+    $wgDBtype = 'mysql';
+    $wgDBserver = getenv('MW_DB_HOST') . ':' . getenv('MW_DB_PORT');
+    $wgDBname = getenv('MW_DB_NAME');
+    $wgDBuser = getenv('MW_DB_USER');
+    $wgDBpassword = getenv('MW_DB_PASSWORD');
+    $wgServer = getenv('MW_SERVER');
+    $wgSitename = getenv('MW_NAME');
+    $wgEmergencyContact = getenv('MW_EMAIL');
+    $wgPasswordSender = getenv('MW_EMAIL');
+    $wgSecretKey = trim(file_get_contents('/etc/mediawiki-security/secret-key'));
+    $wgUpgradeKey = trim(file_get_contents('/etc/mediawiki-security/upgrade-key'));
+    $wgUploadDirectory = '/var/www/html/images';
+    $wgTmpDirectory = '/tmp';
+    // JSON preserves boolean, numeric and nested array values without interpolation.
+    $settings = json_decode(file_get_contents('/etc/mediawiki/settings.json'), true, 512, JSON_THROW_ON_ERROR);
+    foreach ($settings as $name => $value) {
+        $GLOBALS[$name] = $value;
+    }
+    {{- range .Values.localSettings.skins }}
+    wfLoadSkin({{ . | toJson }});
+    {{- end }}
+    {{- range .Values.localSettings.extensions }}
+    wfLoadExtension({{ . | toJson }});
+    {{- end }}
+    // Trusted administrator PHP: expressions, includes and extension functions.
+    require '/etc/mediawiki/extra.php';
+    if (PHP_SAPI !== 'cli' && getenv('MW_READ_ONLY') === 'true') {
+        $wgReadOnly = getenv('MW_READ_ONLY_REASON');
+    }
+  ports.conf: |
+    Listen 8080
+  vhost.conf: |
+    <VirtualHost *:8080>
+      ServerName localhost
+      DocumentRoot /var/www/html
+      ErrorLog /proc/self/fd/2
+      CustomLog /proc/self/fd/1 combined
+      <Directory /var/www/html>
+        Require all granted
+        AllowOverride None
+      </Directory>
+    </VirtualHost>

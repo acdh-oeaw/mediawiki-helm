@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mediawiki
+description: MediaWiki with optional dedicated MariaDB or external database, Rancher
+  UI and values-based configuration
+type: application
+version: 0.3.0
+appVersion: 1.43.11
+kubeVersion: '>=1.25.0-0'
+annotations:
+  catalog.cattle.io/display-name: MediaWiki
+  catalog.cattle.io/release-name: mediawiki
